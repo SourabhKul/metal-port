@@ -6,6 +6,40 @@ struct ParticleState {
     float3 velocity;
 };
 
+// High-Fidelity Boris Integrator (Standard for Supercomputer Benchmarks like GTC)
+kernel void boris_kernel(
+    device ParticleState* particles [[buffer(0)]],
+    constant float3& B_field [[buffer(1)]],
+    constant float3& E_field [[buffer(2)]],
+    constant float& dt [[buffer(3)]],
+    uint id [[thread_position_in_grid]])
+{
+    float3 x = particles[id].position;
+    float3 v = particles[id].velocity;
+    
+    float q_m = 1.0f; // charge/mass ratio
+    float dt2 = dt * 0.5f;
+    
+    // 1. Half-step electric field push
+    float3 v_minus = v + q_m * E_field * dt2;
+    
+    // 2. Magnetic rotation
+    float3 t = q_m * B_field * dt2;
+    float3 s = 2.0f * t / (1.0f + dot(t, t));
+    float3 v_prime = v_minus + cross(v_minus, t);
+    float3 v_plus = v_minus + cross(v_prime, s);
+    
+    // 3. Second half-step electric field push
+    v = v_plus + q_m * E_field * dt2;
+    
+    // 4. Position update
+    x = x + v * dt;
+    
+    // Save state
+    particles[id].velocity = v;
+    particles[id].position = x;
+}
+
 struct ShimParams {
     float3 B_offset;
     float3 E_offset;

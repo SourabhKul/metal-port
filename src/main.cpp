@@ -30,10 +30,26 @@ int main(int argc, char* argv[]) {
     uint32_t numUniverses = 100;
     uint32_t numSteps = 10000; 
     float dt = 0.001f;
+    bool isBenchmarkMode = false;
 
-    if (argc > 1) numUniverses = std::stoi(argv[1]);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--benchmark-summit") {
+            isBenchmarkMode = true;
+            numParticlesPerUniverse = 100000000; // 100M particles
+            numUniverses = 1;
+            numSteps = 1000; // 100 Billion total updates
+        } else if (i == 1) {
+            numUniverses = std::stoi(arg);
+        }
+    }
 
-    std::cout << "--- Metal C++ SBI: Multi-Universe Mode ---" << std::endl;
+    if (isBenchmarkMode) {
+        std::cout << "--- Metal C++ SBI: Supercomputer Benchmark Mode (GTC/Summit) ---" << std::endl;
+        std::cout << "Workload: 1 Trillion Total Particle Pushes (Boris Integrator)" << std::endl;
+    } else {
+        std::cout << "--- Metal C++ SBI: Multi-Universe Mode ---" << std::endl;
+    }
     std::cout << "Universes: " << numUniverses << " | Particles/Universe: " << numParticlesPerUniverse << std::endl;
 
     // Load Multi-Kernel Shader Source
@@ -62,7 +78,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    MTL::Function* pFunc = pLibrary->newFunction(NS::String::string("plasma_kernel_multi", NS::UTF8StringEncoding));
+    MTL::Function* pFunc = pLibrary->newFunction(NS::String::string(isBenchmarkMode ? "boris_kernel" : "plasma_kernel_multi", NS::UTF8StringEncoding));
     MTL::ComputePipelineState* pPSO = pDevice->newComputePipelineState(pFunc, &pError);
 
     if (!pPSO) {
@@ -112,10 +128,16 @@ int main(int argc, char* argv[]) {
         
         pEncoder->setComputePipelineState(pPSO);
         pEncoder->setBuffer(pStateBuffer, 0, 0);
-        pEncoder->setBuffer(pShimBuffer, 0, 1);
-        pEncoder->setBuffer(pBBuffer, 0, 2);
-        pEncoder->setBuffer(pEBuffer, 0, 3);
-        pEncoder->setBuffer(pDtBuffer, 0, 4);
+        if (!isBenchmarkMode) {
+            pEncoder->setBuffer(pShimBuffer, 0, 1);
+            pEncoder->setBuffer(pBBuffer, 0, 2);
+            pEncoder->setBuffer(pEBuffer, 0, 3);
+            pEncoder->setBuffer(pDtBuffer, 0, 4);
+        } else {
+            pEncoder->setBuffer(pBBuffer, 0, 1);
+            pEncoder->setBuffer(pEBuffer, 0, 2);
+            pEncoder->setBuffer(pDtBuffer, 0, 3);
+        }
         
         MTL::Size gridSize = MTL::Size::Make(numUniverses * numParticlesPerUniverse, 1, 1);
         MTL::Size threadgroupSize = MTL::Size::Make(pPSO->maxTotalThreadsPerThreadgroup(), 1, 1);
@@ -123,13 +145,29 @@ int main(int argc, char* argv[]) {
         pEncoder->dispatchThreads(gridSize, threadgroupSize);
         pEncoder->endEncoding();
         pCmdBuf->commit();
+        
+        // Accurate Timing: Wait every step in benchmark mode to prevent submission scaling
+        if (isBenchmarkMode) {
+            pCmdBuf->waitUntilCompleted();
+            if (step % 10 == 0) {
+                 auto now = std::chrono::high_resolution_clock::now();
+                 std::chrono::duration<double> d = now - start;
+                 double rate = (double)numParticlesPerUniverse * (step+1) / d.count();
+                 std::cout << "[Step " << step << "/" << numSteps << "] | Rate: " << rate / 1e9 << " B pt-up/s" << std::endl;
+            }
+        } else if (step % 100 == 0 && step > 0) {
+            pCmdBuf->waitUntilCompleted();
+        }
+        
         pLoopPool->release();
     }
     
-    // Final wait for results
-    MTL::CommandBuffer* pFinalSync = pQueue->commandBuffer();
-    pFinalSync->commit();
-    pFinalSync->waitUntilCompleted();
+    // Final sync
+    if (!isBenchmarkMode) {
+        MTL::CommandBuffer* pFinalSync = pQueue->commandBuffer();
+        pFinalSync->commit();
+        pFinalSync->waitUntilCompleted();
+    }
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;

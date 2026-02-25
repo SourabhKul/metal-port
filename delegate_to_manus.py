@@ -35,20 +35,23 @@ def create_manus_task(prompt):
         return None
 
 if __name__ == "__main__":
-    context = """
-    We have developed a high-performance C++ Metal SBI (Simulation-Based Inference) solver running on an M4 Max Mac Studio.
+    if len(sys.argv) > 1:
+        task_prompt = sys.argv[1]
+    else:
+        context = """
+        We have developed a high-performance C++ Metal SBI (Simulation-Based Inference) solver running on an M4 Max Mac Studio.
+        
+        Current Achievements:
+        - Performance: ~15.8 Billion particle-updates per second (12x speedup over Python/MLX).
+        - Application: Tokamak Plasma Turbulence simulation (Lorentz Force integration).
+        - Algorithm: ABC-SMC (Approximate Bayesian Computation Sequential Monte Carlo) with Beta-distributed step sizes for parameter refinement.
+        - Successfully converged on optimal magnetic shim configurations with extreme precision (3e-4 distance).
+        
+        Goal:
+        Find out how we can do publishing-worthy research using this amazing solver. 
+        Identify specific grand challenges in fusion physics, plasma turbulence, or SBI methodology where this 12x speedup on consumer hardware allows us to perform research that was previously limited to supercomputers.
+        Suggest specific papers or journals (e.g., Physical Review Letters, Journal of Computational Physics, Nuclear Fusion) that would value these results.
+        """
+        task_prompt = f"Research Plan for C++ Metal SBI Solver:\n{context}"
     
-    Current Achievements:
-    - Performance: ~15.8 Billion particle-updates per second (12x speedup over Python/MLX).
-    - Application: Tokamak Plasma Turbulence simulation (Lorentz Force integration).
-    - Algorithm: ABC-SMC (Approximate Bayesian Computation Sequential Monte Carlo) with Beta-distributed step sizes for parameter refinement.
-    - Successfully converged on optimal magnetic shim configurations with extreme precision (3e-4 distance).
-    
-    Goal:
-    Find out how we can do publishing-worthy research using this amazing solver. 
-    Identify specific grand challenges in fusion physics, plasma turbulence, or SBI methodology where this 12x speedup on consumer hardware allows us to perform research that was previously limited to supercomputers.
-    Suggest specific papers or journals (e.g., Physical Review Letters, Journal of Computational Physics, Nuclear Fusion) that would value these results.
-    """
-    
-    task_prompt = f"Research Plan for C++ Metal SBI Solver:\n{context}"
     create_manus_task(task_prompt)
