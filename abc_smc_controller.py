@@ -50,5 +50,5 @@ class ABCSMCController:
 
 if __name__ == "__main__":
     controller = ABCSMCController()
-    for g in range(5):
+    for g in range(controller.generations):
         controller.run_generation(g)
