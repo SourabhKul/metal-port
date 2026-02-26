@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
             isBenchmarkMode = true;
             numParticlesPerUniverse = 100000000; // 100M particles
             numUniverses = 1;
-            numSteps = 1000; // 100 Billion total updates
+            numSteps = 10000; // 1 Trillion total updates (100M * 10k)
         } else if (i == 1) {
             numUniverses = std::stoi(arg);
         }
